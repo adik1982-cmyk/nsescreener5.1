@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#080b0f"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="NSE Screener"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <link rel="manifest" href="./manifest.json"/>
+  <link rel="apple-touch-icon" href="./icons/icon-192.png"/>
+  <title>NSE Intraday Screener v5.1</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    :root{
+      --bg:#080b0f;--p1:#0d1117;--p2:#111827;--p3:#1a2535;
+      --bdr:#1e2d3d;--bdr2:#2d3f55;
+      --mute:#4a5568;--sub:#64748b;--txt:#e2e8f0;--hd:#f8fafc;
+      --green:#00ff88;--gdim:#003310;
+      --red:#ff4444;--rdim:#2a0000;
+      --amber:#f59e0b;--adim:#2a1500;
+      --blue:#3b82f6;--bdim:#1e3a5f;
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --hdr-h:0px;
+    }
+    html,body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;height:100%;overflow:hidden;}
+
+    /* ── FIX 1: STICKY LAYOUT — header + footer fixed, only rows scroll ── */
+    .app-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;}
+    .sticky-top{flex-shrink:0;background:var(--p1);border-bottom:1px solid var(--bdr);}
+    .scroll-body{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+    .sticky-bot{flex-shrink:0;}
+
+    /* ── HEADER ── */
+    .hdr{padding:calc(10px + var(--safe-t)) 14px 10px;display:flex;justify-content:space-between;align-items:center;}
+    .brand{display:flex;align-items:center;gap:8px;}
+    .brand-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:glow 1.5s ease-in-out infinite;}
+    @keyframes glow{0%,100%{opacity:1;box-shadow:0 0 6px var(--green);}50%{opacity:.3;box-shadow:none;}}
+    .brand-dot.off{background:var(--red);animation:none;}
+    .brand-dot.holiday{background:var(--amber);animation:none;}
+    .brand-name{color:var(--green);font-size:11px;font-weight:700;letter-spacing:.12em;}
+    .brand-sub{color:var(--mute);font-size:9px;letter-spacing:.08em;margin-top:1px;}
+    .hdr-right{display:flex;align-items:center;gap:6px;}
+    .mkt-pill{padding:4px 10px;border-radius:5px;font-size:10px;font-weight:700;letter-spacing:.08em;border:1px solid;}
+    .pill-open{background:#001a0833;border-color:#00ff8855;color:var(--green);}
+    .pill-closed{background:#1a000033;border-color:#ff444455;color:var(--red);}
+    .pill-holiday{background:#1a120033;border-color:#f59e0b55;color:var(--amber);}
+    .pill-pre{background:#1a120033;border-color:#f59e0b55;color:var(--amber);}
+    .icon-btn{background:var(--p2);border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;cursor:pointer;color:var(--sub);font-size:14px;transition:all .15s;}
+    .icon-btn:hover{color:var(--green);border-color:var(--green);}
+    .icon-btn.spin{animation:spin .7s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .install-btn{display:none;background:#001a08;border:1px solid #00ff8844;border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--green);font-size:11px;font-weight:700;letter-spacing:.04em;}
+    .install-btn.show{display:block;}
+
+    /* ── STAT CARDS ── */
+    .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:0 14px 10px;}
+    .stat-card{background:var(--p2);border:1px solid var(--bdr);border-radius:7px;padding:6px 8px;text-align:center;}
+    .stat-val{font-size:15px;font-weight:700;}
+    .stat-lbl{font-size:8px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;margin-top:2px;}
+
+    /* ── MARKET STATUS BAR ── */
+    .mkt-bar{background:var(--bg);padding:5px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);}
+    .mkt-status-txt{font-size:10px;font-family:monospace;}
+    .cd-right{display:flex;align-items:center;gap:6px;}
+    .cd-timer{font-size:11px;color:var(--amber);font-family:monospace;}
+    .cd-track{width:50px;height:2px;background:var(--bdr);border-radius:1px;overflow:hidden;}
+    .cd-fill{height:100%;background:var(--amber);border-radius:1px;transition:width 1s linear;}
+
+    /* ── TIMEFRAME ── */
+    .tf-bar{background:var(--p1);padding:7px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);}
+    .tf-lbl{font-size:9px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;}
+    .tf-pills{display:flex;gap:4px;}
+    .tf-pill{padding:3px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid var(--bdr);color:var(--mute);letter-spacing:.06em;transition:all .15s;}
+    .tf-pill.active{background:var(--green);border-color:var(--green);color:#000;}
+
+    /* ── MODE TOGGLE ── */
+    .mode-row{background:var(--p1);padding:7px 14px;display:flex;gap:6px;border-bottom:1px solid var(--bdr);}
+    .mode-btn{flex:1;padding:8px 0;border-radius:7px;text-align:center;cursor:pointer;font-size:11px;font-weight:700;border:1px solid;letter-spacing:.06em;transition:all .2s;}
+    .mb-bull{background:var(--gdim);border-color:var(--green);color:var(--green);}
+    .mb-bull-off{background:transparent;border-color:var(--bdr);color:var(--mute);}
+    .mb-bear{background:var(--rdim);border-color:var(--red);color:var(--red);}
+    .mb-bear-off{background:transparent;border-color:var(--bdr);color:var(--mute);}
+
+    /* ── SECTOR PILLS ── */
+    .sec-row{background:var(--bg);padding:6px 14px;display:flex;gap:5px;overflow-x:auto;border-bottom:1px solid var(--bdr);}
+    .sec-row::-webkit-scrollbar{display:none;}
+    .sec-pill{padding:3px 9px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;cursor:pointer;border:1px solid var(--bdr);color:var(--mute);letter-spacing:.08em;transition:all .12s;flex-shrink:0;text-transform:uppercase;}
+    .sec-pill.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+    /* ── COLUMN HEADERS ── */
+    .col-hdr{background:var(--p1);padding:6px 14px;display:grid;grid-template-columns:2fr 1fr .75fr .75fr .75fr .75fr;gap:2px;border-bottom:1px solid var(--bdr);}
+    .col-hdr span{font-size:9px;letter-spacing:.08em;color:var(--sub);text-transform:uppercase;font-weight:600;cursor:pointer;transition:color .15s;user-select:none;}
+    .col-hdr span:not(:first-child){text-align:right;}
+    .col-hdr span:hover{color:var(--green);}
+    .col-hdr span.sorted{color:var(--green);}
+
+    /* ── STOCK ROWS ── */
+    .srow{padding:12px 14px;display:grid;grid-template-columns:2fr 1fr .75fr .75fr .75fr .75fr;gap:2px;border-bottom:1px solid var(--p2);border-left:3px solid transparent;border-right:3px solid transparent;align-items:center;cursor:pointer;transition:background .15s,border-color .15s;min-height:56px;}
+    .srow:hover{background:var(--p3);}
+    .srow:active{background:var(--bdim);transform:scale(.99);}
+    .srow.r-sb{border-left-color:var(--green);}
+    .srow.r-sb:hover{background:#001a0a;border-right-color:var(--green);}
+    .srow.r-b{border-left-color:var(--amber);}
+    .srow.r-b:hover{background:#1a1000;border-right-color:var(--amber);}
+    .srow.r-ss{border-left-color:var(--red);}
+    .srow.r-ss:hover{background:#1a0000;border-right-color:var(--red);}
+    .srow.r-s{border-left-color:#f97316;}
+    .srow.r-s:hover{background:#1a0800;border-right-color:#f97316;}
+    .sym-name{font-size:15px;font-weight:900;color:#fff;letter-spacing:.02em;}
+    .sym-meta{display:flex;align-items:center;gap:4px;margin-top:3px;}
+    .sig-tag{font-size:9px;padding:2px 6px;border-radius:2px;font-weight:700;letter-spacing:.07em;}
+    .st-sb{background:#001a08;color:var(--green);border:1px solid #00ff8833;}
+    .st-b{background:#1a0e00;color:var(--amber);border:1px solid #f59e0b33;}
+    .st-ss{background:#1a0000;color:var(--red);border:1px solid #ff444433;}
+    .st-s{background:#1a0500;color:#f97316;border:1px solid #f9731633;}
+    .st-w{background:#111827;color:var(--mute);border:1px solid var(--bdr);}
+    .sym-sect{font-size:9px;color:var(--mute);}
+    .cell{font-size:12px;font-weight:700;text-align:right;font-family:'Segoe UI',sans-serif;}
+    .cg{color:var(--green);}
+    .cr{color:var(--red);}
+    .ca{color:var(--amber);}
+    .cw{color:#fff;}
+    .cm{color:var(--sub);}
+
+    /* ── SENTIMENT BAR ── */
+    .sent-bar{background:var(--p2);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bdr);}
+    .sent-lbl{font-size:9px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;}
+    .sent-dots{display:flex;gap:3px;}
+    .sent-dot{width:14px;height:5px;border-radius:1px;}
+    .sent-val{font-size:10px;font-weight:700;letter-spacing:.08em;}
+
+    /* ── PROGRESS ── */
+    .prog-box{margin:10px 14px;background:var(--p2);border:1px solid var(--bdr);border-radius:8px;padding:14px;display:none;}
+    .prog-hd{font-size:11px;color:var(--hd);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+    .spin-sm{display:inline-block;width:11px;height:11px;border:2px solid var(--bdr);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+    .prog-stages{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+    .ps{padding:2px 8px;border-radius:3px;font-size:9px;border:1px solid var(--bdr);color:var(--mute);letter-spacing:.06em;}
+    .ps.active{border-color:var(--amber);color:var(--amber);background:var(--adim);}
+    .ps.done{border-color:var(--green);color:var(--green);background:var(--gdim);}
+    .prog-bg{height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;}
+    .prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:2px;transition:width .3s;}
+    .prog-txt{font-size:9px;color:var(--mute);margin-top:6px;}
+
+    /* ── STATES ── */
+    .state-box{padding:50px 20px;text-align:center;}
+    .state-icon{font-size:36px;margin-bottom:12px;}
+    .state-title{color:var(--hd);font-size:14px;font-weight:700;margin-bottom:6px;letter-spacing:.04em;}
+    .state-sub{color:var(--mute);font-size:11px;line-height:1.7;}
+
+    /* ── BOTTOM NAV ── */
+    .bnav{background:var(--p1);border-top:1px solid var(--bdr);display:flex;padding:6px 0 calc(6px + var(--safe-b));}
+    .bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:4px;-webkit-tap-highlight-color:transparent;}
+    .bnav-icon-wrap{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bdr);background:var(--p2);transition:all .15s;}
+    .bnav-btn.active .bnav-icon-wrap{background:var(--gdim);border-color:var(--green);}
+    .bnav-lbl{font-size:8px;color:var(--mute);letter-spacing:.08em;text-transform:uppercase;}
+    .bnav-btn.active .bnav-lbl{color:var(--green);}
+    .bnav-icon{font-size:15px;}
+
+    /* ── SECTIONS ── */
+    .section{display:none;}
+    .section.active{display:block;}
+
+    /* ── SETTINGS ── */
+    .settings-wrap{padding:16px;}
+    .set-title{font-size:13px;font-weight:700;color:var(--hd);margin-bottom:14px;letter-spacing:.05em;}
+    .conn-box{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;margin-bottom:14px;font-size:11px;border:1px solid;}
+    .conn-ok{background:#001a08;border-color:#00ff8833;color:var(--green);}
+    .conn-no{background:#1a0000;border-color:#ff444433;color:var(--red);}
+    .fgrp{margin-bottom:12px;}
+    .flbl{font-size:9px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;}
+    .finput{width:100%;background:var(--p2);border:1px solid var(--bdr);border-radius:7px;padding:10px 12px;color:var(--txt);font-size:12px;font-family:'Courier New',monospace;outline:none;transition:border-color .15s;}
+    .finput:focus{border-color:var(--green);}
+    .save-btn{width:100%;padding:12px;background:var(--gdim);color:var(--green);border:1px solid var(--green);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.08em;transition:all .15s;}
+    .thr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+    .info-box{margin-top:14px;padding:10px 12px;background:var(--p2);border-radius:8px;border:1px solid var(--bdr);font-size:10px;color:var(--mute);line-height:1.8;}
+
+    /* ── AUTO SECTION ── */
+    .auto-wrap{padding:16px;}
+    .auto-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bdr);}
+    .ar-lbl{font-size:12px;color:var(--txt);}
+    .ar-sub{font-size:10px;color:var(--mute);margin-top:2px;}
+    .toggle{width:42px;height:22px;border-radius:11px;background:var(--bdr);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;}
+    .toggle.on{background:var(--green);}
+    .toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:white;top:3px;left:3px;transition:left .2s;}
+    .toggle.on::after{left:23px;}
+    .iv-sel{background:var(--p2);color:var(--txt);border:1px solid var(--bdr);border-radius:6px;padding:5px 8px;font-size:11px;outline:none;}
+    .time-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+    .t-chip{padding:4px 10px;border-radius:4px;font-size:10px;cursor:pointer;border:1px solid var(--bdr);color:var(--mute);letter-spacing:.06em;transition:all .12s;}
+    .t-chip.active{background:var(--gdim);border-color:var(--green);color:var(--green);}
+    .auto-status{margin-top:14px;padding:10px 12px;background:var(--p2);border-radius:8px;border:1px solid var(--bdr);font-size:10px;color:var(--mute);line-height:1.8;white-space:pre-wrap;}
+
+    /* ── TOAST ── */
+    .toast{position:fixed;bottom:calc(75px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(10px);background:var(--p2);border:1px solid var(--green);color:var(--green);padding:8px 16px;border-radius:6px;font-size:11px;z-index:9999;opacity:0;transition:all .25s;white-space:nowrap;pointer-events:none;max-width:90vw;text-align:center;}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    .toast.err{border-color:var(--red);color:var(--red);}
+    .toast.warn{border-color:var(--amber);color:var(--amber);}
+
+    /* ── BOTTOM SHEETS ── */
+    .sheet-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.8);display:none;align-items:flex-end;}
+    .sheet-overlay.open{display:flex;}
+    .sheet{background:var(--p1);border-radius:20px 20px 0 0;width:100%;padding:16px 16px calc(16px + var(--safe-b));max-height:90vh;overflow-y:auto;border-top:1px solid var(--bdr);}
+    .sheet-handle{width:36px;height:4px;background:var(--bdr2);border-radius:2px;margin:0 auto 16px;}
+
+    /* ── INSTALL BANNER ── */
+    .install-banner{position:fixed;bottom:calc(70px + var(--safe-b));left:12px;right:12px;z-index:200;background:#001a08;border:1px solid #00ff8833;border-radius:12px;padding:12px 14px;display:none;align-items:center;gap:10px;box-shadow:0 4px 24px rgba(0,255,136,.1);}
+    .install-banner.show{display:flex;}
+
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  </style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ═══ STICKY TOP ═══ -->
+  <div class="sticky-top" id="stickyTop">
+
+    <!-- Header -->
+    <div class="hdr">
+      <div class="brand">
+        <div class="brand-dot" id="brandDot"></div>
+        <div>
+          <div class="brand-name">NSE SCREENER PRO</div>
+          <div class="brand-sub">INTRADAY · OPTIONS · v5.1</div>
+        </div>
+      </div>
+      <div class="hdr-right">
+        <div class="mkt-pill" id="mktPill">—</div>
+        <button class="icon-btn" id="refreshBtn" onclick="manualScan()">↻</button>
+        <button class="install-btn" id="installBtn" onclick="installApp()">⬇ Install</button>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-val" style="color:var(--green)" id="sBull">—</div><div class="stat-lbl">Bullish</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--red)" id="sBear">—</div><div class="stat-lbl">Bearish</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--amber)" id="sWatch">—</div><div class="stat-lbl">Watch</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:var(--blue)" id="sTotal">—</div><div class="stat-lbl">Scanned</div></div>
+    </div>
+
+    <!-- Screener only controls -->
+    <div id="screenerControls">
+      <!-- Market/countdown bar -->
+      <div class="mkt-bar">
+        <span class="mkt-status-txt" id="mktStatusTxt">—</span>
+        <div class="cd-right">
+          <span class="cd-timer" id="cdTimer">—</span>
+          <div class="cd-track"><div class="cd-fill" id="cdFill" style="width:100%"></div></div>
+        </div>
+      </div>
+
+      <!-- Timeframe -->
+      <div class="tf-bar">
+        <span class="tf-lbl">Candle TF</span>
+        <div class="tf-pills">
+          <div class="tf-pill" data-tf="FIVE_MINUTE" onclick="setTF(this)">5M</div>
+          <div class="tf-pill active" data-tf="FIFTEEN_MINUTE" onclick="setTF(this)">15M</div>
+          <div class="tf-pill" data-tf="ONE_HOUR" onclick="setTF(this)">1H</div>
+        </div>
+      </div>
+
+      <!-- Mode toggle -->
+      <div class="mode-row">
+        <div class="mode-btn mb-bull" id="btnBull" onclick="setMode('bull')">▲ BULLISH <span id="bCnt">(0)</span></div>
+        <div class="mode-btn mb-bear-off" id="btnBear" onclick="setMode('bear')">▼ BEARISH <span id="beCnt">(0)</span></div>
+      </div>
+
+      <!-- Sector pills -->
+      <div class="sec-row">
+        <div class="sec-pill active" data-s="All" onclick="setSec(this)">ALL</div>
+        <div class="sec-pill" data-s="Banking" onclick="setSec(this)">BANK</div>
+        <div class="sec-pill" data-s="IT" onclick="setSec(this)">IT</div>
+        <div class="sec-pill" data-s="Auto" onclick="setSec(this)">AUTO</div>
+        <div class="sec-pill" data-s="Energy" onclick="setSec(this)">ENERGY</div>
+        <div class="sec-pill" data-s="Pharma" onclick="setSec(this)">PHARMA</div>
+        <div class="sec-pill" data-s="Metals" onclick="setSec(this)">METALS</div>
+        <div class="sec-pill" data-s="FMCG" onclick="setSec(this)">FMCG</div>
+        <div class="sec-pill" data-s="Infra" onclick="setSec(this)">INFRA</div>
+        <div class="sec-pill" data-s="NBFC" onclick="setSec(this)">NBFC</div>
+        <div class="sec-pill" data-s="Power" onclick="setSec(this)">POWER</div>
+      </div>
+
+      <!-- Column headers with sort -->
+      <div class="col-hdr">
+        <span>Symbol</span>
+        <span style="text-align:right">LTP</span>
+        <span id="hChg" onclick="sortBy('chg')">Chg% <span id="arChg"></span></span>
+        <span id="hRsi" onclick="sortBy('rsi')">RSI <span id="arRsi"></span></span>
+        <span id="hMacd" onclick="sortBy('macd')">MACD <span id="arMacd"></span></span>
+        <span id="hOi" onclick="sortBy('oiChgPct')">OI% <span id="arOi"></span></span>
+      </div>
+
+      <!-- Sentiment bar -->
+      <div class="sent-bar">
+        <span class="sent-lbl">Sentiment</span>
+        <div class="sent-dots" id="sentDots"></div>
+        <span class="sent-val" id="sentVal" style="color:var(--mute)">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SCROLLABLE BODY ═══ -->
+  <div class="scroll-body" id="scrollBody">
+
+    <!-- SCREENER -->
+    <div class="section active" id="sec-screener">
+      <div class="prog-box" id="progBox">
+        <div class="prog-hd"><span class="spin-sm"></span><span id="progHd">Scanning…</span></div>
+        <div class="prog-stages">
+          <span class="ps" id="ps1">1·LOGIN</span>
+          <span class="ps" id="ps2">2·QUOTES</span>
+          <span class="ps" id="ps3">3·CANDLES</span>
+          <span class="ps" id="ps4">4·SIGNALS</span>
+          <span class="ps" id="ps5">5·DONE</span>
+        </div>
+        <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-txt" id="progTxt">Starting…</div>
+      </div>
+      <div id="stockList">
+        <div class="state-box">
+          <div class="state-icon">🔌</div>
+          <div class="state-title">CONNECT ANGEL ONE</div>
+          <div class="state-sub">Go to Settings → enter credentials once → Connect.<br><br>Uses <strong style="color:var(--green)">15-min intraday candles</strong> from Angel One for RSI, MACD, EMA — perfect for options trading.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUTO SCAN -->
+    <div class="section" id="sec-auto">
+      <div class="auto-wrap">
+        <div class="set-title">⏰ AUTO-SCAN</div>
+        <div class="auto-row">
+          <div><div class="ar-lbl">Enable Auto-Scan</div><div class="ar-sub">Scans at selected times (saved on toggle)</div></div>
+          <button class="toggle" id="autoTgl" onclick="toggleAuto()"></button>
+        </div>
+        <div class="auto-row">
+          <div><div class="ar-lbl">Refresh Interval</div><div class="ar-sub">How often during market hours</div></div>
+          <select class="iv-sel" id="ivSel" onchange="saveAutoConf()">
+            <option value="300">5 min</option>
+            <option value="600" selected>10 min</option>
+            <option value="900">15 min</option>
+            <option value="1800">30 min</option>
+          </select>
+        </div>
+        <div class="auto-row">
+          <div><div class="ar-lbl">Push Notifications</div><div class="ar-sub">Alert on Strong Buy / Strong Sell</div></div>
+          <button class="toggle" id="notifTgl" onclick="toggleNotif()"></button>
+        </div>
+        <div class="auto-row">
+          <div><div class="ar-lbl">New Signals Only</div><div class="ar-sub">Skip repeat alerts for same stocks</div></div>
+          <button class="toggle on" id="newOnlyTgl" onclick="toggleNewOnly()"></button>
+        </div>
+        <div style="margin-top:14px;">
+          <div class="flbl">Intraday Scan Times (IST)</div>
+          <div class="time-grid" id="timeGrid">
+            <div class="t-chip active" data-t="09:20">9:20</div>
+            <div class="t-chip active" data-t="09:45">9:45</div>
+            <div class="t-chip active" data-t="10:15">10:15</div>
+            <div class="t-chip active" data-t="10:45">10:45</div>
+            <div class="t-chip active" data-t="11:15">11:15</div>
+            <div class="t-chip" data-t="11:45">11:45</div>
+            <div class="t-chip active" data-t="12:15">12:15</div>
+            <div class="t-chip" data-t="13:00">13:00</div>
+            <div class="t-chip active" data-t="13:30">13:30</div>
+            <div class="t-chip active" data-t="14:00">14:00</div>
+            <div class="t-chip active" data-t="14:30">14:30</div>
+            <div class="t-chip active" data-t="15:00">15:00</div>
+          </div>
+        </div>
+        <div class="auto-status" id="autoStatus">⏸ Auto-scan OFF</div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="section" id="sec-settings">
+      <div class="settings-wrap">
+        <div class="set-title">⚙ ANGEL ONE API</div>
+        <div class="conn-box" id="connBox"><span>🔴</span><span id="connTxt">Not connected</span></div>
+        <div class="fgrp"><div class="flbl">Client ID</div><input class="finput" id="s_cid" type="text" placeholder="A12345678" autocomplete="off" spellcheck="false"/></div>
+        <div class="fgrp"><div class="flbl">API Key</div><input class="finput" id="s_key" type="password" placeholder="From SmartAPI portal"/></div>
+        <div class="fgrp"><div class="flbl">MPIN</div><input class="finput" id="s_pin" type="password" placeholder="4-digit trading MPIN"/></div>
+        <div class="fgrp"><div class="flbl">TOTP Secret</div><input class="finput" id="s_totp" type="password" placeholder="Base32 secret from enable-totp"/></div>
+        <button class="save-btn" id="saveBtn" onclick="saveAndConnect()">⚡ SAVE &amp; CONNECT</button>
+        <div style="margin-top:16px;">
+          <div class="flbl">Intraday Signal Thresholds</div>
+          <div class="thr-grid">
+            <div><div style="font-size:9px;color:var(--mute);margin-bottom:4px;">RSI Bull Min</div><input class="finput" id="t_rsi" type="number" value="55" min="40" max="75"/></div>
+            <div><div style="font-size:9px;color:var(--mute);margin-bottom:4px;">RSI Bear Max</div><input class="finput" id="t_rsi_b" type="number" value="45" min="15" max="55"/></div>
+            <div><div style="font-size:9px;color:var(--mute);margin-bottom:4px;">Vol × Avg Min</div><input class="finput" id="t_vol" type="number" value="1.2" min="1" max="3" step="0.1"/></div>
+            <div><div style="font-size:9px;color:var(--mute);margin-bottom:4px;">Min Score</div><input class="finput" id="t_score" type="number" value="40" min="0" max="90"/></div>
+          </div>
+          <button class="save-btn" style="margin-top:10px;background:var(--p2);color:var(--blue);border-color:var(--blue);" onclick="saveThr()">SAVE THRESHOLDS</button>
+        </div>
+        <div class="info-box">
+          ✅ Credentials saved on device — no re-login needed<br/>
+          ✅ TOTP auto-generated on every scan<br/>
+          ✅ 15-min intraday candles from Angel One<br/>
+          ✅ RSI, MACD, EMA 9/21 computed from intraday data<br/>
+          🔒 Stored only on your device (localStorage)
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /scroll-body -->
+
+  <!-- ═══ STICKY BOTTOM NAV ═══ -->
+  <div class="sticky-bot">
+    <div class="bnav">
+      <button class="bnav-btn active" id="nav-screener" onclick="showSec('screener')">
+        <div class="bnav-icon-wrap"><span class="bnav-icon">📊</span></div>
+        <span class="bnav-lbl">Signals</span>
+      </button>
+      <button class="bnav-btn" id="nav-auto" onclick="showSec('auto')">
+        <div class="bnav-icon-wrap"><span class="bnav-icon">⏰</span></div>
+        <span class="bnav-lbl">Auto</span>
+      </button>
+      <button class="bnav-btn" id="nav-settings" onclick="showSec('settings')">
+        <div class="bnav-icon-wrap"><span class="bnav-icon">⚙️</span></div>
+        <span class="bnav-lbl">Settings</span>
+      </button>
+    </div>
+  </div>
+
+</div><!-- /app-shell -->
+
+<!-- TV Sheet -->
+<div class="sheet-overlay" id="tvSheet" onclick="closeSheet('tvSheet')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="tvSheetContent"></div>
+  </div>
+</div>
+
+<!-- Install Sheet -->
+<div class="sheet-overlay" id="installSheet" onclick="closeSheet('installSheet')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="installContent"></div>
+  </div>
+</div>
+
+<!-- Notif guide sheet -->
+<div class="sheet-overlay" id="notifSheet" onclick="closeSheet('notifSheet')">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="notifContent"></div>
+  </div>
+</div>
+
+<!-- Install banner -->
+<div class="install-banner" id="installBanner">
+  <img src="./icons/icon-192.png" style="width:38px;height:38px;border-radius:10px;flex-shrink:0;"/>
+  <div style="flex:1;">
+    <div style="color:#fff;font-size:13px;font-weight:700;">Install NSE Screener</div>
+    <div style="color:var(--mute);font-size:10px;margin-top:2px;">Add to home screen</div>
+  </div>
+  <button onclick="installApp()" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;">INSTALL</button>
+  <button onclick="hideBanner()" style="background:transparent;border:none;color:var(--mute);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0;">✕</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// NSE INTRADAY SCREENER v5 — All 7 fixes
+// ═══════════════════════════════════════════════════════════════════════════
+const AB = 'https://apiconnect.angelbroking.com';
+
+// ── FIX 7: NSE Holiday Calendar 2025 + 2026 ───────────────────────────────
+const NSE_HOLIDAYS = {
+  '2025-01-26':'Republic Day',
+  '2025-02-26':'Mahashivratri',
+  '2025-03-14':'Holi',
+  '2025-04-10':'Id-Ul-Fitr (Ramzan Id)',
+  '2025-04-14':'Dr. Ambedkar Jayanti',
+  '2025-04-18':'Good Friday',
+  '2025-05-01':'Maharashtra Day',
+  '2025-06-07':'Eid ul-Adha',
+  '2025-07-29':'Moharram',
+  '2025-08-15':'Independence Day',
+  '2025-08-27':'Ganesh Chaturthi',
+  '2025-10-02':'Gandhi Jayanti & Dussehra',
+  '2025-10-21':'Diwali Laxmi Pujan',
+  '2025-10-22':'Diwali Balipratipada',
+  '2025-11-05':'Prakash Gurpurb/Gurunanak Jayanti',
+  '2025-12-25':'Christmas',
+  '2026-01-26':'Republic Day',
+  '2026-02-26':'Mahashivratri',
+  '2026-03-20':'Holi',
+  '2026-03-30':'Id-Ul-Fitr (Ramzan Id)',
+  '2026-04-03':'Good Friday',
+  '2026-04-14':'Dr. Ambedkar Jayanti',
+  '2026-05-01':'Maharashtra Day',
+  '2026-06-17':'Eid ul-Adha',
+  '2026-06-26':'Muharram',
+  '2026-03-03':'Mahashivratri',
+  '2026-03-20':'Holi',
+  '2026-03-30':'Id-Ul-Fitr (Ramzan Id)',
+  '2026-04-03':'Good Friday',
+  '2026-04-14':'Dr. Ambedkar Jayanti',
+  '2026-05-01':'Maharashtra Day',
+  '2026-06-17':'Eid ul-Adha',
+  '2026-07-17':'Moharram',
+  '2026-08-15':'Independence Day',
+  '2026-09-15':'Ganesh Chaturthi',
+  '2026-10-02':'Gandhi Jayanti',
+  '2026-10-19':'Dussehra',
+  '2026-11-09':'Diwali Laxmi Pujan',
+  '2026-11-10':'Diwali Balipratipada',
+  '2026-11-24':'Gurunanak Jayanti',
+  '2026-12-25':'Christmas',
+};
+
+function todayKey(){
+  const n=new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+function isHoliday(){return NSE_HOLIDAYS[todayKey()]||null;}
+function getHolidayName(){return NSE_HOLIDAYS[todayKey()]||'';}
+function nextTradingDay(){
+  const d=new Date();
+  d.setDate(d.getDate()+1);
+  for(let i=0;i<10;i++){
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const day=d.getDay();
+    if(day!==0&&day!==6&&!NSE_HOLIDAYS[key]) return d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'});
+    d.setDate(d.getDate()+1);
+  }
+  return 'Next trading day';
+}
+
+function isMarketDay(){
+  const d=new Date().getDay();
+  return d>=1&&d<=5&&!isHoliday();
+}
+function isMarketHours(){
+  if(!isMarketDay())return false;
+  const n=new Date(),t=n.getHours()*60+n.getMinutes();
+  return t>=570&&t<=930;
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+let session=null,bullRows=[],bearRows=[],allRows=[];
+let mode='bull',sector='All',tf='FIFTEEN_MINUTE';
+let scanning=false,stopFlag=false;
+let autoOn=false,notifOn=false,newOnly=true;
+let schedTimers=[],autoTimer=null,cdInterval=null;
+let countdown=600,cdMax=600;
+let prevBull=new Set(),prevBear=new Set();
+let wakeLock=null,deferredInstall=null;
+let sortCol=null,sortDir='desc';
+let T={rsi:55,rsiB:45,vol:1.2,score:40};
+
+// ── NSE Universe ───────────────────────────────────────────────────────────
+const UNI=[
+  {sym:'RELIANCE',token:'2885',sector:'Energy'},{sym:'TCS',token:'11536',sector:'IT'},
+  {sym:'HDFCBANK',token:'1333',sector:'Banking'},{sym:'INFY',token:'1594',sector:'IT'},
+  {sym:'ICICIBANK',token:'4963',sector:'Banking'},{sym:'SBIN',token:'3045',sector:'Banking'},
+  {sym:'TATAMOTORS',token:'3456',sector:'Auto'},{sym:'WIPRO',token:'3787',sector:'IT'},
+  {sym:'AXISBANK',token:'5900',sector:'Banking'},{sym:'BAJFINANCE',token:'317',sector:'NBFC'},
+  {sym:'MARUTI',token:'10999',sector:'Auto'},{sym:'SUNPHARMA',token:'3351',sector:'Pharma'},
+  {sym:'M&M',token:'2031',sector:'Auto'},{sym:'LT',token:'11483',sector:'Infra'},
+  {sym:'KOTAKBANK',token:'1922',sector:'Banking'},{sym:'NTPC',token:'11630',sector:'Power'},
+  {sym:'POWERGRID',token:'14977',sector:'Power'},{sym:'ADANIENT',token:'25',sector:'Diversified'},
+  {sym:'HCLTECH',token:'7229',sector:'IT'},{sym:'ONGC',token:'2475',sector:'Energy'},
+  {sym:'HINDALCO',token:'1363',sector:'Metals'},{sym:'TATASTEEL',token:'3499',sector:'Metals'},
+  {sym:'TECHM',token:'13538',sector:'IT'},{sym:'DRREDDY',token:'881',sector:'Pharma'},
+  {sym:'TRENT',token:'1964',sector:'Retail'},{sym:'ZOMATO',token:'5097',sector:'Retail'},
+  {sym:'BAJAJFINSV',token:'16675',sector:'NBFC'},{sym:'INDUSINDBK',token:'5258',sector:'Banking'},
+  {sym:'FEDERALBNK',token:'1023',sector:'Banking'},{sym:'BANKBARODA',token:'4668',sector:'Banking'},
+  {sym:'TATACONSUM',token:'3432',sector:'FMCG'},{sym:'HINDUNILVR',token:'1394',sector:'FMCG'},
+  {sym:'ITC',token:'1660',sector:'FMCG'},{sym:'CIPLA',token:'694',sector:'Pharma'},
+  {sym:'DIVISLAB',token:'10940',sector:'Pharma'},{sym:'LUPIN',token:'10440',sector:'Pharma'},
+  {sym:'JSWSTEEL',token:'11723',sector:'Metals'},{sym:'SAIL',token:'3001',sector:'Metals'},
+  {sym:'COALINDIA',token:'20374',sector:'Energy'},{sym:'IOC',token:'1624',sector:'Energy'},
+  {sym:'BPCL',token:'526',sector:'Energy'},{sym:'GAIL',token:'1209',sector:'Energy'},
+  {sym:'TATAPOWER',token:'3426',sector:'Power'},{sym:'DLF',token:'1346',sector:'Realty'},
+  {sym:'HEROMOTOCO',token:'1348',sector:'Auto'},{sym:'BAJAJ-AUTO',token:'16669',sector:'Auto'},
+  {sym:'EICHERMOT',token:'910',sector:'Auto'},{sym:'ASHOKLEY',token:'212',sector:'Auto'},
+  {sym:'HAL',token:'2303',sector:'Infra'},{sym:'BEL',token:'383',sector:'Infra'},
+  {sym:'POLYCAB',token:'16675',sector:'Infra'},{sym:'HAVELLS',token:'1254',sector:'Infra'},
+  {sym:'TITAN',token:'3506',sector:'Diversified'},{sym:'BHARTIARTL',token:'10604',sector:'Telecom'},
+  {sym:'LTIM',token:'17971',sector:'IT'},{sym:'PERSISTENT',token:'18096',sector:'IT'},
+  {sym:'COFORGE',token:'11543',sector:'IT'},{sym:'ASIANPAINT',token:'236',sector:'Chemicals'},
+  {sym:'SRF',token:'3273',sector:'Chemicals'},{sym:'PFC',token:'14299',sector:'NBFC'},
+  {sym:'RECLTD',token:'11284',sector:'NBFC'},{sym:'APOLLOHOSP',token:'157',sector:'Pharma'},
+  {sym:'PNB',token:'10666',sector:'Banking'},{sym:'CANBK',token:'10794',sector:'Banking'},
+  {sym:'ULTRACEMCO',token:'11532',sector:'Cement'},{sym:'ADANIPORTS',token:'15083',sector:'Infra'},
+  {sym:'HDFCLIFE',token:'17818',sector:'Insurance'},{sym:'SBILIFE',token:'21808',sector:'Insurance'},
+];
+
+// ── TOTP ───────────────────────────────────────────────────────────────────
+function b32(s){const A='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';s=s.toUpperCase().replace(/=+$/,'');let b=0,v=0;const o=[];for(const c of s){v=(v<<5)|A.indexOf(c);b+=5;if(b>=8){b-=8;o.push((v>>>b)&0xFF);}}return new Uint8Array(o);}
+async function genTOTP(sec){try{const k=b32(sec),c=Math.floor(Date.now()/30000),buf=new ArrayBuffer(8);new DataView(buf).setUint32(4,c,false);const ck=await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-1'},false,['sign']);const s=new Uint8Array(await crypto.subtle.sign('HMAC',ck,buf));const o=s[19]&0xf;return String(((s[o]&0x7f)<<24|(s[o+1]&0xff)<<16|(s[o+2]&0xff)<<8|(s[o+3]&0xff))%1000000).padStart(6,'0');}catch{return null;}}
+
+// ── Login ──────────────────────────────────────────────────────────────────
+function mkHdr(key,jwt){const h={'Content-Type':'application/json','Accept':'application/json','X-UserType':'USER','X-SourceID':'WEB','X-ClientLocalIP':'127.0.0.1','X-ClientPublicIP':'127.0.0.1','X-MACAddress':'00:00:00:00:00:00'};if(key)h['X-PrivateKey']=key;if(jwt)h['Authorization']='Bearer '+jwt;return h;}
+
+async function login(){
+  const cid=ls('cid'),key=ls('key'),pin=ls('pin'),sec=ls('totp');
+  if(!cid||!key||!pin||!sec)return false;
+  const t=await genTOTP(sec);if(!t)return false;
+  try{
+    const r=await fetch(`${AB}/rest/auth/angelbroking/user/v1/loginByPassword`,{method:'POST',headers:mkHdr(key),body:JSON.stringify({clientcode:cid,password:pin,totp:t})});
+    const d=await r.json();
+    if(!d.status||!d.data?.jwtToken)return false;
+    session={jwt:d.data.jwtToken,apiKey:key,clientId:cid};
+    return true;
+  }catch{return false;}
+}
+
+// ── Quotes ─────────────────────────────────────────────────────────────────
+async function fetchQuotes(tokens){
+  try{
+    const r=await fetch(`${AB}/rest/secure/angelbroking/market/v1/quote/`,{method:'POST',headers:mkHdr(session.apiKey,session.jwt),body:JSON.stringify({mode:'FULL',exchangeTokens:{NSE:tokens}})});
+    const d=await r.json();
+    if(d?.errorcode==='AB1010'||d?.errorcode==='AB8050'){const ok=await login();if(ok)return fetchQuotes(tokens);}
+    const m={};
+    if(d?.data?.fetched)d.data.fetched.forEach(q=>{
+      const tok=q.symbolToken||q.symboltoken||q.token||'';
+      if(tok)m[tok]={
+        ltp:parseFloat(q.ltp||0),
+        close:parseFloat(q.close||q.ltp||0),
+        open:parseFloat(q.open||0),high:parseFloat(q.high||0),low:parseFloat(q.low||0),
+        vol:parseInt(q.tradeVolume||q.tradedVolume||0),
+        oi:parseInt(q.opnInterest||0),
+        // OI Change % — try multiple Angel One field names
+        oiChgPct:(()=>{
+          const raw=parseFloat(q.opnInterestChange||q.oiChange||q.changeInOI||0);
+          if(raw!==0) return raw;
+          const oi=parseInt(q.opnInterest||0);
+          const oiPrev=parseInt(q.opnInterestPrev||q.prevOpnInterest||0);
+          if(oi>0&&oiPrev>0) return((oi-oiPrev)/oiPrev)*100;
+          return 0;
+        })(),
+        pct:parseFloat(q.percentChange||0),
+      };
+    });
+    return m;
+  }catch{return{};}
+}
+
+// ── 15-min Intraday Candles ────────────────────────────────────────────────
+async function fetchCandles(token){
+  try{
+    const now=new Date(),from=new Date(now);from.setHours(9,0,0,0);
+    const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const r=await fetch(`${AB}/rest/secure/angelbroking/historical/v1/getCandleData`,{method:'POST',headers:mkHdr(session.apiKey,session.jwt),body:JSON.stringify({exchange:'NSE',symboltoken:token,interval:tf,fromdate:fmt(from),todate:fmt(now)})});
+    const d=await r.json();
+    return(d?.data&&d.data.length>=3)?d.data:null;
+  }catch{return null;}
+}
+
+// ── Indicators ─────────────────────────────────────────────────────────────
+function ema(c,p){if(c.length<p)return c[c.length-1]||0;const k=2/(p+1);let e=c.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<c.length;i++)e=c[i]*k+e*(1-k);return e;}
+function rsi(c,p=14){if(c.length<p+1)return 50;let g=0,l=0;for(let i=1;i<=p;i++){const d=c[i]-c[i-1];if(d>0)g+=d;else l-=d;}const ag=g/p,al=l/p;return al===0?100:100-100/(1+ag/al);}
+function macdVal(c){return c.length<12?0:ema(c,Math.min(12,c.length))-ema(c,Math.min(26,c.length));}
+function vAvg(v){const s=v.slice(0,-1);return s.length?s.reduce((a,b)=>a+b,0)/s.length:1;}
+
+function bullScore(s){
+  let sc=0;const vr=s.vol/(s.volAvg||1);
+  if(vr>2)sc+=30;else if(vr>1.5)sc+=20;else if(vr>1.2)sc+=10;
+  if(s.rsi>60&&s.rsi<80)sc+=25;else if(s.rsi>=55)sc+=15;else if(s.rsi>=50)sc+=5;
+  if(s.macd>0)sc+=20;
+  if(s.ema9>s.ema21)sc+=15;
+  if(s.ltp>s.ema9)sc+=10;
+  if(s.oiChgPct>3)sc+=10;else if(s.oiChgPct>0)sc+=5;
+  if(s.chg>0.5)sc+=5;else if(s.chg>0)sc+=2;
+  return Math.min(sc,100);
+}
+function bearScore(s){
+  let sc=0;const vr=s.vol/(s.volAvg||1);
+  if(vr>2&&s.chg<0)sc+=30;else if(vr>1.5&&s.chg<0)sc+=20;else if(vr>1.2&&s.chg<0)sc+=10;
+  if(s.rsi<40&&s.rsi>20)sc+=25;else if(s.rsi<=45)sc+=15;else if(s.rsi<=50)sc+=5;
+  if(s.macd<0)sc+=20;
+  if(s.ema9<s.ema21)sc+=15;
+  if(s.ltp<s.ema9)sc+=10;
+  if(s.oiChgPct>3&&s.chg<0)sc+=10;else if(s.oiChgPct>0&&s.chg<0)sc+=5;
+  if(s.chg<-0.5)sc+=5;else if(s.chg<0)sc+=2;
+  return Math.min(sc,100);
+}
+function sigInfo(sc,bull){
+  if(bull){if(sc>=70)return{lbl:'STRONG BUY',tc:'st-sb',rc:'r-sb'};if(sc>=45)return{lbl:'BUY',tc:'st-b',rc:'r-b'};return{lbl:'WATCH',tc:'st-w',rc:''};}
+  else{if(sc>=70)return{lbl:'STRONG SELL',tc:'st-ss',rc:'r-ss'};if(sc>=45)return{lbl:'SELL',tc:'st-s',rc:'r-s'};return{lbl:'WATCH',tc:'st-w',rc:''};}
+}
+
+// ── SCAN ───────────────────────────────────────────────────────────────────
+async function runScan(auto=false){
+  if(scanning)return;
+  if(!session){setStg(1,'active');const ok=await login();if(!ok){toast('Connect Angel One in Settings',true);showSec('settings');return;}setStg(1,'done');}
+  scanning=true;bullRows=[];bearRows=[];allRows=[];stopFlag=false;
+  await reqWL();setScanUI(true);setStg(2,'active');
+  $('progHd').textContent='Fetching live quotes…';
+
+  for(let i=0;i<UNI.length;i+=50){
+    if(stopFlag)break;
+    const batch=UNI.slice(i,i+50);
+    const quotes=await fetchQuotes(batch.map(s=>s.token));
+    setStg(2,'done');setStg(3,'active');
+    $('progHd').textContent='Fetching 15-min candles…';
+
+    for(const s of batch){
+      if(stopFlag)break;
+      const q=quotes[s.token]||quotes[String(s.token)];
+      if(!q||!q.ltp||q.ltp===0){updProg(allRows.length+bullRows.length+bearRows.length);continue;}
+
+      const candles=await fetchCandles(s.token);
+      let rv=50,rm=0,e9=q.ltp,e21=q.ltp,va=q.vol||1;
+      if(candles&&candles.length>=3){
+        const cl=candles.map(c=>parseFloat(c[4]));
+        const vl=candles.map(c=>parseInt(c[5]));
+        rv=rsi(cl,Math.min(14,cl.length-1));rm=macdVal(cl);
+        e9=ema(cl,Math.min(9,cl.length));e21=ema(cl,Math.min(21,cl.length));
+        va=vAvg(vl)||q.vol||1;
+      }else{
+        const range=(q.high-q.low)||1;
+        rv=q.pct>0?Math.min(55+(q.pct/range*20),80):Math.max(45+(q.pct/range*20),20);
+        rm=q.ltp-q.close;e9=q.ltp;e21=q.close;va=q.vol||1;
+      }
+
+      const row={sym:s.sym,sector:s.sector,ltp:q.ltp,chg:q.pct,vol:q.vol,volAvg:va,
+        rsi:rv,macd:rm,ema9:e9,ema21:e21,oi:q.oi,
+        oiChgPct:q.oiChgPct||0,
+        bScore:0,beScore:0};
+      row.bScore=bullScore(row);row.beScore=bearScore(row);
+      allRows.push(row);
+      if(row.bScore>=T.score)bullRows.push({...row,score:row.bScore,bull:true});
+      if(row.beScore>=T.score)bearRows.push({...row,score:row.beScore,bull:false});
+      updProg(allRows.length);
+      if(allRows.length%5===0)await sleep(50);
+    }
+    await sleep(150);
+  }
+
+  setStg(3,'done');setStg(4,'active');
+  bullRows.sort((a,b)=>b.score-a.score);
+  bearRows.sort((a,b)=>b.score-a.score);
+  setStg(4,'done');setStg(5,'done');
+  scanning=false;await relWL();setScanUI(false);
+  updateStats();updateSentiment();renderList();updTS();startCD();
+
+  if(notifOn){
+    const bNew=bullRows.filter(r=>r.score>=70&&!prevBull.has(r.sym));
+    const beNew=bearRows.filter(r=>r.score>=70&&!prevBear.has(r.sym));
+    const all=[...bNew,...beNew];
+    if(all.length>0)sendNotif(`${all.length} intraday signal${all.length>1?'s':''}`,all.slice(0,3).map(r=>`${r.sym} ${r.bull?'▲':'▼'}`).join(' · '));
+  }
+  prevBull=new Set(bullRows.filter(r=>r.score>=70).map(r=>r.sym));
+  prevBear=new Set(bearRows.filter(r=>r.score>=70).map(r=>r.sym));
+  if(auto)toast(`⏰ ${bullRows.length} bullish · ${bearRows.length} bearish`);
+  else toast(`✅ ${bullRows.length} bullish · ${bearRows.length} bearish`);
+}
+
+function setStg(n,st){const el=$(`ps${n}`);el.className='ps'+(st==='done'?' done':st==='active'?' active':'');}
+function updProg(done){const pct=Math.round((done/UNI.length)*100);$('progFill').style.width=pct+'%';$('progTxt').textContent=`${done}/${UNI.length} · ${bullRows.length} bullish · ${bearRows.length} bearish`;}
+function setScanUI(on){const pb=$('progBox'),rb=$('refreshBtn');if(on){pb.style.display='block';rb.classList.add('spin');}else{pb.style.display='none';rb.classList.remove('spin');}}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderList(){
+  let rows=(mode==='bull'?bullRows:bearRows).filter(r=>sector==='All'||r.sector===sector);
+  if(sortCol){rows=[...rows].sort((a,b)=>sortDir==='desc'?(b[sortCol]||0)-(a[sortCol]||0):(a[sortCol]||0)-(b[sortCol]||0));}
+  const list=$('stockList');
+  if(!rows.length){
+    list.innerHTML=`<div class="state-box"><div class="state-icon">${mode==='bull'?'📈':'📉'}</div><div class="state-title">NO ${mode==='bull'?'BULLISH':'BEARISH'} SIGNALS</div><div class="state-sub">Market may be consolidating. Try 5M timeframe or rescan after next candle.</div></div>`;
+    return;
+  }
+  list.innerHTML=rows.map(r=>{
+    const si=sigInfo(r.score,r.bull);
+    const cc=r.chg>=0?'cg':'cr';
+    const rc=r.rsi>=60?'cg':r.rsi>=50?'ca':'cr';
+    const mc=r.macd>0?'cg':'cr';
+    const oc=r.oiChgPct>3?'cg':r.oiChgPct>0?'ca':r.oiChgPct<0?'cr':'cm';
+    return `<div class="srow ${si.rc}" onclick="openTV('${r.sym}')" ontouchstart="this.classList.add('touched')" ontouchend="this.classList.remove('touched')">
+      <div>
+        <div class="sym-name">${r.sym}</div>
+        <div class="sym-meta"><span class="sig-tag ${si.tc}">${si.lbl}</span><span class="sym-sect">${r.sector}</span></div>
+      </div>
+      <div class="cell cw">₹${fL(r.ltp)}</div>
+      <div class="cell ${cc}">${r.chg>=0?'+':''}${f1(r.chg)}%</div>
+      <div class="cell ${rc}">${f1(r.rsi)}</div>
+      <div class="cell ${mc}">${r.macd>=0?'+':''}${f1(r.macd)}</div>
+      <div class="cell ${oc}">${r.oiChgPct>=0?'+':''}${f1(r.oiChgPct)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats(){
+  $('sBull').textContent=bullRows.length;$('sBear').textContent=bearRows.length;
+  $('sWatch').textContent=allRows.filter(r=>r.bScore<T.score&&r.beScore<T.score).length;
+  $('sTotal').textContent=allRows.length;
+  $('bCnt').textContent=`(${bullRows.length})`;$('beCnt').textContent=`(${bearRows.length})`;
+}
+function updateSentiment(){
+  const total=allRows.length||1,bp=bullRows.length/total;
+  const dots=$('sentDots');
+  dots.innerHTML=[...Array(5)].map((_,i)=>`<div class="sent-dot" style="background:${i<Math.round(bp*5)?'var(--green)':'var(--bdr)'}"></div>`).join('');
+  const sv=$('sentVal');
+  if(bp>=0.6){sv.style.color='var(--green)';sv.textContent='BULLISH';}
+  else if(bp<=0.4){sv.style.color='var(--red)';sv.textContent='BEARISH';}
+  else{sv.style.color='var(--amber)';sv.textContent='NEUTRAL';}
+}
+
+// ── Sort ───────────────────────────────────────────────────────────────────
+function sortBy(col){
+  sortCol=sortCol===col?(sortDir=sortDir==='desc'?'asc':'desc',col):col;
+  if(sortCol!==col)sortDir='desc';
+  ['Chg','Rsi','Macd','Oi'].forEach((id,i)=>{
+    const cols=['chg','rsi','macd','oiChgPct'];
+    $('h'+id).classList.toggle('sorted',cols[i]===sortCol);
+    $('ar'+id).textContent=cols[i]===sortCol?(sortDir==='desc'?' ↓':' ↑'):'';
+  });
+  renderList();
+}
+
+// ── Mode / Sector / TF ─────────────────────────────────────────────────────
+function setMode(m){mode=m;$('btnBull').className='mode-btn '+(m==='bull'?'mb-bull':'mb-bull-off');$('btnBear').className='mode-btn '+(m==='bear'?'mb-bear':'mb-bear-off');renderList();}
+function setSec(el){sector=el.dataset.s;document.querySelectorAll('.sec-pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');renderList();}
+function setTF(el){tf=el.dataset.tf;document.querySelectorAll('.tf-pill').forEach(p=>p.classList.remove('active'));el.classList.add('active');toast(`TF: ${tf==='FIVE_MINUTE'?'5M':tf==='FIFTEEN_MINUTE'?'15M':'1H'}`);}
+
+// ── FIX 2: TradingView — correct buttons ───────────────────────────────────
+function openTV(sym){
+  const nse='NSE:'+sym;
+  const enc=encodeURIComponent(nse);
+  const webUrl='https://in.tradingview.com/chart/?symbol='+enc;
+  const isA=/android/i.test(navigator.userAgent);
+  const isI=/iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  $('tvSheetContent').innerHTML=`
+    <div style="color:var(--sub);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Open Chart</div>
+    <div style="color:#fff;font-size:17px;font-weight:900;margin-bottom:16px;">${sym} · NSE</div>
+    <a href="tradingview://chart/?symbol=${nse}"
+      style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#001a08;border:1px solid #00ff8833;border-radius:10px;margin-bottom:10px;text-decoration:none;">
+      <span style="font-size:24px;">📱</span>
+      <div><div style="color:var(--green);font-size:14px;font-weight:700;">Open in TradingView App</div><div style="color:var(--mute);font-size:11px;margin-top:2px;">Opens directly in installed app</div></div>
+      <span style="margin-left:auto;color:var(--green);font-size:18px;">→</span>
+    </a>
+    <a href="${webUrl}" target="_blank" rel="noopener noreferrer"
+      onclick="closeSheet('tvSheet')"
+      style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bdim);border:1px solid #1e3a5f;border-radius:10px;margin-bottom:10px;text-decoration:none;">
+      <span style="font-size:24px;">🌐</span>
+      <div><div style="color:var(--blue);font-size:14px;font-weight:700;">Open in Chrome Browser</div><div style="color:var(--mute);font-size:11px;margin-top:2px;">TradingView SuperChart in browser</div></div>
+      <span style="margin-left:auto;color:var(--blue);font-size:18px;">→</span>
+    </a>
+    <button onclick="copySymbol('${nse}')"
+      style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--p2);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;width:100%;text-align:left;cursor:pointer;">
+      <span style="font-size:24px;">📋</span>
+      <div><div style="color:var(--sub);font-size:14px;font-weight:700;">Copy Symbol</div><div style="color:var(--mute);font-size:11px;margin-top:2px;">${nse}</div></div>
+    </button>
+    <button onclick="closeSheet('tvSheet')" style="width:100%;padding:12px;background:var(--p3);border:1px solid var(--bdr);border-radius:10px;color:var(--mute);font-size:13px;font-weight:700;cursor:pointer;">CANCEL</button>`;
+  openSheet('tvSheet');
+}
+
+function copySymbol(sym){
+  navigator.clipboard.writeText(sym).catch(()=>{const e=document.createElement('textarea');e.value=sym;document.body.appendChild(e);e.select();document.execCommand('copy');document.body.removeChild(e);});
+  toast('📋 Copied: '+sym);setTimeout(()=>closeSheet('tvSheet'),800);
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+function saveAndConnect(){
+  const cid=$('s_cid').value.trim(),key=$('s_key').value.trim(),pin=$('s_pin').value.trim(),totp=$('s_totp').value.trim();
+  if(!cid||!key||!pin||!totp){toast('Fill all four fields',true);return;}
+  localStorage.setItem('_cid',btoa(cid));localStorage.setItem('_key',btoa(key));
+  localStorage.setItem('_pin',btoa(pin));localStorage.setItem('_totp',btoa(totp));
+  const btn=$('saveBtn');btn.textContent='⟳ CONNECTING…';btn.disabled=true;
+  login().then(ok=>{
+    btn.textContent='⚡ SAVE & CONNECT';btn.disabled=false;
+    if(ok){setConn(true,ls('cid'));toast('✅ Connected! Starting scan…');showSec('screener');runScan();}
+    else{setConn(false,'Login failed — check credentials');toast('Login failed',true);}
+  });
+}
+function saveThr(){T.rsi=+$('t_rsi').value||55;T.rsiB=+$('t_rsi_b').value||45;T.vol=+$('t_vol').value||1.2;T.score=+$('t_score').value||40;localStorage.setItem('_thr',JSON.stringify(T));toast('✅ Thresholds saved');}
+function setConn(ok,txt){const b=$('connBox');b.className='conn-box '+(ok?'conn-ok':'conn-no');$('connTxt').textContent=(ok?'🟢 Connected as ':'🔴 ')+txt;}
+function ls(k){try{const v=localStorage.getItem('_'+k);return v?atob(v):'';}catch{return '';}}
+
+// ── FIX 4: Auto-scan — save state to localStorage ─────────────────────────
+function toggleAuto(){
+  autoOn=!autoOn;
+  $('autoTgl').className='toggle'+(autoOn?' on':'');
+  localStorage.setItem('_autoOn',autoOn?'1':'0'); // FIX 4: persist
+  setupSched();updAutoStatus();
+  toast(autoOn?'⏰ Auto-scan ON':'⏸ Auto-scan OFF');
+}
+
+// ── FIX 5: Push notifications — detect denied + show guide ────────────────
+function toggleNotif(){
+  if(notifOn){notifOn=false;$('notifTgl').className='toggle';localStorage.setItem('_notifOn','0');return;}
+  if(!('Notification' in window)){toast('Notifications not supported on this browser',true);return;}
+  if(Notification.permission==='granted'){
+    notifOn=true;$('notifTgl').className='toggle on';localStorage.setItem('_notifOn','1');toast('🔔 Notifications ON');return;
+  }
+  if(Notification.permission==='denied'){
+    showNotifGuide();return;
+  }
+  Notification.requestPermission().then(p=>{
+    if(p==='granted'){notifOn=true;$('notifTgl').className='toggle on';localStorage.setItem('_notifOn','1');toast('🔔 Notifications enabled!');}
+    else{showNotifGuide();}
+  });
+}
+
+function showNotifGuide(){
+  $('notifContent').innerHTML=`
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:36px;margin-bottom:8px;">🔔</div>
+      <div style="color:var(--red);font-size:15px;font-weight:800;margin-bottom:4px;">Notification Permission Denied</div>
+      <div style="color:var(--mute);font-size:11px;line-height:1.6;">Enable notifications in Chrome settings to receive trading alerts</div>
+    </div>
+    <div style="background:var(--p2);border-radius:10px;padding:14px;margin-bottom:14px;">
+      <div style="color:var(--hd);font-size:12px;font-weight:700;margin-bottom:12px;letter-spacing:.04em;">HOW TO ENABLE ON ANDROID:</div>
+      ${['Open Chrome browser on your phone','Tap ⋮ menu → Settings','Tap Site settings → Notifications','Find this site and tap Allow','Come back and tap the Notifications toggle again'].map((s,i)=>`
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
+        <div style="background:var(--gdim);border:1px solid #00ff8833;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:var(--green);">${i+1}</div>
+        <div style="color:var(--txt);font-size:12px;line-height:1.5;padding-top:2px;">${s}</div>
+      </div>`).join('')}
+    </div>
+    <button onclick="closeSheet('notifSheet')" style="width:100%;padding:12px;background:var(--p3);border:1px solid var(--bdr);border-radius:10px;color:var(--mute);font-size:13px;font-weight:700;cursor:pointer;">GOT IT</button>`;
+  openSheet('notifSheet');
+}
+
+function toggleNewOnly(){newOnly=!newOnly;$('newOnlyTgl').className='toggle'+(newOnly?' on':'');localStorage.setItem('_newOnly',newOnly?'1':'0');updAutoStatus();}
+
+// ── Auto scan scheduler ────────────────────────────────────────────────────
+function isMarket(){return isMarketHours();}
+function setupSched(){
+  schedTimers.forEach(t=>clearTimeout(t));schedTimers=[];
+  if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
+  if(!autoOn)return;
+  document.querySelectorAll('#timeGrid .t-chip.active').forEach(el=>{
+    const[h,m]=el.dataset.t.split(':').map(Number);
+    const now=new Date(),target=new Date();target.setHours(h,m,0,0);
+    let delay=target-now;if(delay<0)delay+=86400000;
+    schedTimers.push(setTimeout(()=>{if(autoOn&&isMarket()&&session)runScan(true);},delay));
+  });
+  const iv=parseInt($('ivSel').value)||600;
+  autoTimer=setInterval(()=>{if(autoOn&&isMarket()&&session)runScan(true);},iv*1000);
+  cdMax=iv;startCD();
+}
+function saveAutoConf(){if(autoOn)setupSched();}
+function updAutoStatus(){
+  const el=$('autoStatus');
+  if(!autoOn){el.textContent='⏸ Auto-scan OFF';return;}
+  const slots=Array.from(document.querySelectorAll('#timeGrid .t-chip.active')).map(e=>e.dataset.t);
+  el.textContent=`✅ ON · TF:${tf==='FIVE_MINUTE'?'5M':'15M'}\nTimes: ${slots.join(', ')}\nNotif: ${notifOn?'ON':'OFF'} · New only: ${newOnly?'YES':'NO'}`;
+}
+document.querySelectorAll('#timeGrid .t-chip').forEach(el=>{el.onclick=()=>{el.classList.toggle('active');updAutoStatus();if(autoOn)setupSched();};});
+
+// ── Countdown ──────────────────────────────────────────────────────────────
+function startCD(){
+  if(cdInterval)clearInterval(cdInterval);
+  countdown=cdMax;
+  cdInterval=setInterval(()=>{
+    countdown--;if(countdown<=0)countdown=cdMax;
+    const mm=String(Math.floor(countdown/60)).padStart(2,'0'),ss=String(countdown%60).padStart(2,'0');
+    $('cdTimer').textContent=mm+':'+ss;
+    $('cdFill').style.width=(countdown/cdMax*100)+'%';
+  },1000);
+}
+
+// ── FIX 7: Market status with holiday detection ────────────────────────────
+function updMarket(){
+  const n=new Date(),d=n.getDay(),t=n.getHours()*60+n.getMinutes();
+  const pill=$('mktPill'),dot=$('brandDot'),statusTxt=$('mktStatusTxt');
+  const timeStr=n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const holiday=isHoliday();
+
+  if(holiday){
+    pill.className='mkt-pill pill-holiday';pill.textContent='HOLIDAY';
+    dot.className='brand-dot holiday';
+    statusTxt.textContent=`🎉 NSE Closed — ${holiday} · Next: ${nextTradingDay()}`;
+    statusTxt.style.color='var(--amber)';
+  }else if(d===0||d===6){
+    pill.className='mkt-pill pill-closed';pill.textContent='WEEKEND';
+    dot.className='brand-dot off';
+    statusTxt.textContent=`📅 NSE Closed — Weekend · Next: ${nextTradingDay()}`;
+    statusTxt.style.color='var(--red)';
+  }else if(t>=555&&t<570){
+    pill.className='mkt-pill pill-pre';pill.textContent='PRE-OPEN';
+    dot.className='brand-dot';
+    statusTxt.textContent=`⏳ Pre-Open Session · Market opens in ${570-t} min`;
+    statusTxt.style.color='var(--amber)';
+  }else if(t>=570&&t<=930){
+    pill.className='mkt-pill pill-open';pill.textContent='NSE OPEN';
+    dot.className='brand-dot';
+    const rem=930-t;
+    statusTxt.textContent=`● Live · ${timeStr} IST · Closes in ${Math.floor(rem/60)}h ${rem%60}m`;
+    statusTxt.style.color='var(--green)';
+  }else{
+    pill.className='mkt-pill pill-closed';pill.textContent='CLOSED';
+    dot.className='brand-dot off';
+    statusTxt.textContent=`🔴 NSE Closed · ${timeStr} · Next: ${nextTradingDay()}`;
+    statusTxt.style.color='var(--red)';
+  }
+}
+
+// ── Pull to refresh ────────────────────────────────────────────────────────
+let ptY=0,ptPull=false;
+const sb=$('scrollBody');
+sb.addEventListener('touchstart',e=>{if(sb.scrollTop===0)ptY=e.touches[0].clientY;},{passive:true});
+sb.addEventListener('touchmove',e=>{if(sb.scrollTop===0&&e.touches[0].clientY-ptY>70)ptPull=true;},{passive:true});
+sb.addEventListener('touchend',()=>{if(ptPull){ptPull=false;manualScan();}});
+function manualScan(){if(!scanning)runScan(false);}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+function sendNotif(title,body){
+  if(!notifOn||Notification.permission!=='granted')return;
+  if(navigator.serviceWorker?.controller)
+    navigator.serviceWorker.controller.postMessage({type:'NOTIFY',title:'NSE: '+title,body});
+  else new Notification('NSE: '+title,{body,icon:'./icons/icon-192.png',tag:'nse',renotify:true});
+}
+
+// ── Wake lock ──────────────────────────────────────────────────────────────
+async function reqWL(){try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch{}}
+async function relWL(){try{if(wakeLock){await wakeLock.release();wakeLock=null;}}catch{}}
+document.addEventListener('visibilitychange',async()=>{if(wakeLock&&document.visibilityState==='visible'&&scanning)await reqWL();});
+
+// ── FIX 6: Install button + banner ────────────────────────────────────────
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  $('installBtn').classList.add('show');
+  setTimeout(()=>$('installBanner').classList.add('show'),3000);
+});
+window.addEventListener('appinstalled',()=>{
+  $('installBtn').classList.remove('show');
+  hideBanner();
+  deferredPrompt=null;
+  toast('✅ App installed successfully!');
+});
+async function installApp(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice;
+    if(outcome==='accepted'){$('installBtn').classList.remove('show');hideBanner();}
+    deferredPrompt=null;
+  }else{showInstallGuide();}
+}
+function hideBanner(){$('installBanner').classList.remove('show');}
+function showInstallGuide(){
+  const isI=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const steps=isI?[
+    'Open this page in <strong style="color:var(--green)">Safari</strong> (not Chrome)',
+    'Tap the <strong style="color:var(--green)">Share ↑ icon</strong> at the bottom',
+    'Scroll and tap <strong style="color:var(--green)">"Add to Home Screen"</strong>',
+    'Tap <strong style="color:var(--green)">Add</strong> at top right'
+  ]:[
+    'Open in <strong style="color:var(--green)">Chrome browser</strong> on your phone',
+    'Tap <strong style="color:var(--green)">⋮ menu</strong> → <strong style="color:var(--green)">Add to Home Screen</strong>',
+    'Tap <strong style="color:var(--green)">Install</strong> on the dialog',
+    'App icon with <strong style="color:var(--green)">NSE Screener</strong> icon appears on home screen'
+  ];
+  $('installContent').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <img src="./icons/icon-192.png" style="width:44px;height:44px;border-radius:12px;flex-shrink:0;"/>
+      <div><div style="color:#fff;font-size:16px;font-weight:800;">Install NSE Screener</div><div style="color:var(--mute);font-size:11px;margin-top:2px;">${isI?'iPhone/iPad':'Android · Samsung'}</div></div>
+    </div>
+    <div style="background:var(--p2);border-radius:10px;padding:14px;margin-bottom:14px;">
+      ${steps.map((s,i)=>`<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:${i<steps.length-1?'12':'0'}px;">
+        <div style="background:var(--gdim);border:1px solid #00ff8833;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:var(--green);">${i+1}</div>
+        <div style="color:var(--txt);font-size:12px;line-height:1.5;padding-top:2px;">${s}</div>
+      </div>`).join('')}
+    </div>
+    <div style="background:#001a08;border:1px solid #00ff8822;border-radius:8px;padding:10px 12px;margin-bottom:14px;">
+      <div style="color:var(--green);font-size:11px;font-weight:600;">Your app URL:</div>
+      <div style="color:var(--mute);font-size:10px;margin-top:4px;word-break:break-all;">${window.location.href}</div>
+    </div>
+    <button onclick="closeSheet('installSheet')" style="width:100%;padding:12px;background:var(--p3);border:1px solid var(--bdr);border-radius:10px;color:var(--mute);font-size:13px;font-weight:700;cursor:pointer;">GOT IT</button>`;
+  openSheet('installSheet');
+}
+
+// ── Sheet helpers ──────────────────────────────────────────────────────────
+function openSheet(id){$( id).classList.add('open');}
+function closeSheet(id){$(id).classList.remove('open');}
+
+// ── Sections ───────────────────────────────────────────────────────────────
+function showSec(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.classList.remove('active'));
+  $(`sec-${name}`).classList.add('active');
+  $(`nav-${name}`).classList.add('active');
+  // Show/hide screener-only controls
+  $('screenerControls').style.display=name==='screener'?'block':'none';
+  // Scroll to top on section change
+  $('scrollBody').scrollTop=0;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function $(id){return document.getElementById(id);}
+function f1(n){return(+n||0).toFixed(1);}
+function fL(n){return(+n||0).toLocaleString('en-IN',{maximumFractionDigits:2});}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function updTS(){const t=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});$('progTxt').textContent='Last scan: '+t+' IST';}
+function toast(msg,err=false,warn=false){const t=$('toast');t.textContent=msg;t.className='toast'+(err?' err':warn?' warn':'')+' show';setTimeout(()=>{t.className='toast'+(err?' err':warn?' warn':'');},3500);}
+
+// ── FIX 4: Restore saved state on init ────────────────────────────────────
+function init(){
+  // Restore credentials
+  $('s_cid').value=ls('cid');
+  $('s_key').value=ls('key')?'••••'+ls('key').slice(-4):'';
+  $('s_pin').value=ls('pin')?'••••':'';
+  $('s_totp').value=ls('totp')?'••••••••••••':'';
+
+  // Restore thresholds
+  try{const saved=localStorage.getItem('_thr');if(saved){T=JSON.parse(saved);$('t_rsi').value=T.rsi;$('t_rsi_b').value=T.rsiB||45;$('t_vol').value=T.vol;$('t_score').value=T.score;}}catch{}
+
+  // FIX 4: Restore toggle states from localStorage
+  autoOn=localStorage.getItem('_autoOn')==='1';
+  notifOn=localStorage.getItem('_notifOn')==='1';
+  newOnly=localStorage.getItem('_newOnly')!=='0';
+  $('autoTgl').className='toggle'+(autoOn?' on':'');
+  $('notifTgl').className='toggle'+(notifOn?' on':'');
+  $('newOnlyTgl').className='toggle'+(newOnly?' on':'');
+  updAutoStatus();
+
+  // Auto-connect
+  if(ls('cid')&&ls('key')){
+    setConn(true,ls('cid'));
+    login().then(ok=>{
+      if(ok){toast('✅ Auto-connected');if(autoOn)setupSched();runScan();}
+      else{setConn(false,'Session expired — reconnect');showSec('settings');}
+    });
+  }else{showSec('settings');}
+
+  // Market clock
+  updMarket();setInterval(updMarket,1000);
+  startCD();
+
+  // Service worker
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));
+    setTimeout(()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}),500);
+  }
+}
+init();
+</script>
+</body>
+</html>
